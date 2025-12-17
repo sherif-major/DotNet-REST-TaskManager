@@ -3531,11 +3531,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/serif/Net9ApiOdev/Api/Api.csproj",
+      "projectUniqueName": "/home/serif/Masaüstü/Net9ApiOdev/Api/Api.csproj",
       "projectName": "Api",
-      "projectPath": "/home/serif/Net9ApiOdev/Api/Api.csproj",
+      "projectPath": "/home/serif/Masaüstü/Net9ApiOdev/Api/Api.csproj",
       "packagesPath": "/home/serif/.nuget/packages/",
-      "outputPath": "/home/serif/Net9ApiOdev/Api/obj/",
+      "outputPath": "/home/serif/Masaüstü/Net9ApiOdev/Api/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/home/serif/.nuget/NuGet/NuGet.Config"
