@@ -110,6 +110,41 @@ app.MapPut("/users/{id:int}", async (
         )
     );
 });
+
+app.MapPost("/users", async (CreateUserDto dto, AppDbContext db) =>
+{
+    var exists = await db.Users.AnyAsync(x => x.Username == dto.Username);
+    if (exists)
+    {
+        return Results.BadRequest(
+            ApiResponse<string>.Fail("Username already exists")
+        );
+    }
+
+    var user = new User
+    {
+        Username = dto.Username,
+        PasswordHash = dto.Password, // şimdilik düz yazı
+        Role = "User"
+    };
+
+    db.Users.Add(user);
+    await db.SaveChangesAsync();
+
+    var response = new UserResponseDto
+    {
+        Id = user.Id,
+        Username = user.Username,
+        Role = user.Role
+    };
+
+    return Results.Created(
+        $"/users/{user.Id}",
+        ApiResponse<UserResponseDto>.SuccessResponse(response, "User created successfully")
+    );
+});
+
+
 app.MapDelete("/users/{id:int}", async (
     int id,
     AppDbContext db) =>
