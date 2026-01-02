@@ -5,6 +5,7 @@ using Api.Models;
 using Microsoft.EntityFrameworkCore;
 using Api.Seed;
 using Api.DTOs.Project;
+using Api.DTOs.Task;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -345,6 +346,132 @@ app.MapDelete("/projects/{id:int}", async (int id, AppDbContext db) =>
         )
     );
 });
+
+app.MapPost("/projects/{projectId:int}/tasks", async (
+    int projectId,
+    CreateTaskDto dto,
+    AppDbContext db) =>
+{
+    var projectExists = await db.Projects.AnyAsync(p => p.Id == projectId);
+    if (!projectExists)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Project not found")
+        );
+    }
+
+    var task = new TaskItem
+    {
+        Title = dto.Title,
+        Description = dto.Description,
+        Status = "Todo",
+        ProjectId = projectId
+    };
+
+    db.TaskItems.Add(task);
+    await db.SaveChangesAsync();
+
+    var response = new TaskResponseDto
+    {
+        Id = task.Id,
+        Title = task.Title,
+        Description = task.Description,
+        Status = task.Status,
+        ProjectId = task.ProjectId
+    };
+
+    return Results.Created(
+        $"/tasks/{task.Id}",
+        ApiResponse<TaskResponseDto>.SuccessResponse(response, "Task created successfully")
+    );
+});
+
+app.MapGet("/projects/{projectId:int}/tasks", async (int projectId, AppDbContext db) =>
+{
+    var projectExists = await db.Projects.AnyAsync(p => p.Id == projectId);
+    if (!projectExists)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Project not found")
+        );
+    }
+
+    var tasks = await db.TaskItems
+        .Where(t => t.ProjectId == projectId)
+        .Select(t => new TaskResponseDto
+        {
+            Id = t.Id,
+            Title = t.Title,
+            Description = t.Description,
+            Status = t.Status,
+            ProjectId = t.ProjectId
+        })
+        .ToListAsync();
+
+    return Results.Ok(
+        ApiResponse<List<TaskResponseDto>>.SuccessResponse(tasks, "Tasks listed successfully")
+    );
+});
+
+app.MapPut("/tasks/{id:int}", async (int id, UpdateTaskDto dto, AppDbContext db) =>
+{
+    var task = await db.TaskItems.FirstOrDefaultAsync(t => t.Id == id);
+    if (task is null)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Task not found")
+        );
+    }
+    
+    var allowed = new[] { "Todo", "InProgress", "Done" };
+    if (!allowed.Contains(dto.Status))
+    {
+        return Results.BadRequest(
+            ApiResponse<string>.Fail("Invalid status. Use: Todo, InProgress, Done")
+        );
+    }
+
+    task.Title = dto.Title;
+    task.Description = dto.Description;
+    task.Status = dto.Status;
+    task.UpdatedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync();
+
+    var response = new TaskResponseDto
+    {
+        Id = task.Id,
+        Title = task.Title,
+        Description = task.Description,
+        Status = task.Status,
+        ProjectId = task.ProjectId
+    };
+
+    return Results.Ok(
+        ApiResponse<TaskResponseDto>.SuccessResponse(response, "Task updated successfully")
+    );
+});
+
+app.MapDelete("/tasks/{id:int}", async (int id, AppDbContext db) =>
+{
+    var task = await db.TaskItems.FirstOrDefaultAsync(t => t.Id == id);
+    if (task is null)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Task not found")
+        );
+    }
+
+    task.IsDeleted = true;
+    task.UpdatedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(
+        ApiResponse<string>.SuccessResponse("Task deleted successfully", "Task deleted successfully")
+    );
+});
+
 
 
 app.Run();
