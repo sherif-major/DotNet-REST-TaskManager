@@ -4,6 +4,7 @@ using Api.Entities;
 using Api.Models;
 using Microsoft.EntityFrameworkCore;
 using Api.Seed;
+using Api.DTOs.Project;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -175,5 +176,175 @@ app.MapDelete("/users/{id:int}", async (
         )
     );
 });
+
+app.MapPost("/projects", async (CreateProjectDto dto, AppDbContext db) =>
+{
+    var userExists = await db.Users.AnyAsync(u => u.Id == dto.UserId);
+    if (!userExists)
+    {
+        return Results.BadRequest(
+            ApiResponse<string>.Fail("UserId is invalid")
+        );
+    }
+
+    var project = new Project
+    {
+        Name = dto.Name,
+        Description = dto.Description,
+        UserId = dto.UserId
+    };
+
+    db.Projects.Add(project);
+    await db.SaveChangesAsync();
+
+    var response = new ProjectResponseDto
+    {
+        Id = project.Id,
+        Name = project.Name,
+        Description = project.Description,
+        UserId = project.UserId
+    };
+
+    return Results.Created(
+        $"/projects/{project.Id}",
+        ApiResponse<ProjectResponseDto>.SuccessResponse(response, "Project created successfully")
+    );
+});
+
+app.MapGet("/projects", async (AppDbContext db) =>
+{
+    var projects = await db.Projects
+        .Select(p => new ProjectResponseDto
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Description = p.Description,
+            UserId = p.UserId
+        })
+        .ToListAsync();
+
+    return Results.Ok(
+        ApiResponse<List<ProjectResponseDto>>.SuccessResponse(
+            projects,
+            "Projects listed successfully"
+        )
+    );
+});
+
+app.MapGet("/projects/{id:int}", async (int id, AppDbContext db) =>
+{
+    var project = await db.Projects
+        .Where(p => p.Id == id)
+        .Select(p => new ProjectResponseDto
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Description = p.Description,
+            UserId = p.UserId
+        })
+        .FirstOrDefaultAsync();
+
+    if (project is null)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Project not found")
+        );
+    }
+
+    return Results.Ok(
+        ApiResponse<ProjectResponseDto>.SuccessResponse(
+            project,
+            "Project retrieved successfully"
+        )
+    );
+});
+
+
+app.MapGet("/users/{userId:int}/projects", async (int userId, AppDbContext db) =>
+{
+    var userExists = await db.Users.AnyAsync(u => u.Id == userId);
+    if (!userExists)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("User not found")
+        );
+    }
+
+    var projects = await db.Projects
+        .Where(p => p.UserId == userId)
+        .Select(p => new ProjectResponseDto
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Description = p.Description,
+            UserId = p.UserId
+        })
+        .ToListAsync();
+
+    return Results.Ok(
+        ApiResponse<List<ProjectResponseDto>>.SuccessResponse(
+            projects,
+            "User projects listed successfully"
+        )
+    );
+});
+
+app.MapPut("/projects/{id:int}", async (int id, UpdateProjectDto dto, AppDbContext db) =>
+{
+    var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
+
+    if (project is null)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Project not found")
+        );
+    }
+
+    project.Name = dto.Name;
+    project.Description = dto.Description;
+    project.UpdatedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync();
+
+    var response = new ProjectResponseDto
+    {
+        Id = project.Id,
+        Name = project.Name,
+        Description = project.Description,
+        UserId = project.UserId
+    };
+
+    return Results.Ok(
+        ApiResponse<ProjectResponseDto>.SuccessResponse(
+            response,
+            "Project updated successfully"
+        )
+    );
+});
+
+app.MapDelete("/projects/{id:int}", async (int id, AppDbContext db) =>
+{
+    var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
+
+    if (project is null)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Project not found")
+        );
+    }
+
+    project.IsDeleted = true;
+    project.UpdatedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(
+        ApiResponse<string>.SuccessResponse(
+            "Project deleted successfully",
+            "Project deleted successfully"
+        )
+    );
+});
+
 
 app.Run();
