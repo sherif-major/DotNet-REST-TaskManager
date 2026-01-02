@@ -3,6 +3,7 @@ using Api.DTOs.User;
 using Api.Entities;
 using Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Api.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await DatabaseSeeder.SeedAsync(db);
+}
 
 app.UseSwagger();
 app.UseSwaggerUI();
@@ -124,7 +130,7 @@ app.MapPost("/users", async (CreateUserDto dto, AppDbContext db) =>
     var user = new User
     {
         Username = dto.Username,
-        PasswordHash = dto.Password, // şimdilik düz yazı
+        PasswordHash = dto.Password,
         Role = "User"
     };
 
