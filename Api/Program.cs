@@ -1,3 +1,7 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Api.Data;
 using Api.DTOs.User;
 using Api.Entities;
@@ -7,6 +11,9 @@ using Api.Seed;
 using Api.DTOs.Project;
 using Api.DTOs.Task;
 using Api.DTOs.Comment;
+using Api.DTOs.Auth;
+using Api.Helpers;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +23,57 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Api", Version = "v1" });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Bearer {token} şeklinde gir. Örn: Bearer eyJhbGciOi..."
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
+
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+            )
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
@@ -29,6 +86,8 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.MapGet("/", () => "API çalışıyor");
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapGet("/users", async (AppDbContext db) =>
 {
     var users = await db.Users
@@ -46,9 +105,11 @@ app.MapGet("/users", async (AppDbContext db) =>
             "Users listed successfully"
         )
     );
-});
+})
+.RequireAuthorization();
 
-app.MapGet("/users/{id:int}", async (int id, AppDbContext db) =>
+
+app.MapGet("/users/{id:int}", async (int id, AppDbContext db) => //controller yerine yazdığım endpointler. 
 {
     var user = await db.Users
         .Where(u => u.Id == id)
@@ -73,7 +134,7 @@ app.MapGet("/users/{id:int}", async (int id, AppDbContext db) =>
             "User retrieved successfully"
         )
     );
-});
+}).RequireAuthorization();
 
 app.MapPut("/users/{id:int}", async (
     int id,
@@ -118,7 +179,7 @@ app.MapPut("/users/{id:int}", async (
             "User updated successfully"
         )
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 app.MapPost("/users", async (CreateUserDto dto, AppDbContext db) =>
 {
@@ -151,7 +212,7 @@ app.MapPost("/users", async (CreateUserDto dto, AppDbContext db) =>
         $"/users/{user.Id}",
         ApiResponse<UserResponseDto>.SuccessResponse(response, "User created successfully")
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 
 app.MapDelete("/users/{id:int}", async (
@@ -177,7 +238,41 @@ app.MapDelete("/users/{id:int}", async (
             "User deleted successfully"
         )
     );
+}).RequireAuthorization(p => p.RequireRole("Admin"));
+
+app.MapPost("/auth/login", async (
+    LoginDto dto,
+    AppDbContext db,
+    IConfiguration config) =>
+{
+    var user = await db.Users
+        .FirstOrDefaultAsync(u =>
+            u.Username == dto.Username &&
+            u.PasswordHash == dto.Password);
+
+    if (user is null)
+    {
+        return Results.Json(
+            ApiResponse<string>.Fail("Invalid username or password"),
+            statusCode: StatusCodes.Status401Unauthorized
+        );
+    }
+
+    var token = JwtTokenHelper.GenerateToken(user, config);
+
+    return Results.Ok(
+        ApiResponse<object>.SuccessResponse(
+            new
+            {
+                token,
+                user.Username,
+                user.Role
+            },
+            "Login successful"
+        )
+    );
 });
+
 
 app.MapPost("/projects", async (CreateProjectDto dto, AppDbContext db) =>
 {
@@ -211,7 +306,7 @@ app.MapPost("/projects", async (CreateProjectDto dto, AppDbContext db) =>
         $"/projects/{project.Id}",
         ApiResponse<ProjectResponseDto>.SuccessResponse(response, "Project created successfully")
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 app.MapGet("/projects", async (AppDbContext db) =>
 {
@@ -231,7 +326,7 @@ app.MapGet("/projects", async (AppDbContext db) =>
             "Projects listed successfully"
         )
     );
-});
+}).RequireAuthorization();
 
 app.MapGet("/projects/{id:int}", async (int id, AppDbContext db) =>
 {
@@ -259,7 +354,7 @@ app.MapGet("/projects/{id:int}", async (int id, AppDbContext db) =>
             "Project retrieved successfully"
         )
     );
-});
+}).RequireAuthorization();
 
 
 app.MapGet("/users/{userId:int}/projects", async (int userId, AppDbContext db) =>
@@ -289,7 +384,7 @@ app.MapGet("/users/{userId:int}/projects", async (int userId, AppDbContext db) =
             "User projects listed successfully"
         )
     );
-});
+}).RequireAuthorization();
 
 app.MapPut("/projects/{id:int}", async (int id, UpdateProjectDto dto, AppDbContext db) =>
 {
@@ -322,7 +417,7 @@ app.MapPut("/projects/{id:int}", async (int id, UpdateProjectDto dto, AppDbConte
             "Project updated successfully"
         )
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 app.MapDelete("/projects/{id:int}", async (int id, AppDbContext db) =>
 {
@@ -346,7 +441,7 @@ app.MapDelete("/projects/{id:int}", async (int id, AppDbContext db) =>
             "Project deleted successfully"
         )
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 app.MapPost("/projects/{projectId:int}/tasks", async (
     int projectId,
@@ -385,7 +480,7 @@ app.MapPost("/projects/{projectId:int}/tasks", async (
         $"/tasks/{task.Id}",
         ApiResponse<TaskResponseDto>.SuccessResponse(response, "Task created successfully")
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 app.MapGet("/projects/{projectId:int}/tasks", async (int projectId, AppDbContext db) =>
 {
@@ -412,7 +507,7 @@ app.MapGet("/projects/{projectId:int}/tasks", async (int projectId, AppDbContext
     return Results.Ok(
         ApiResponse<List<TaskResponseDto>>.SuccessResponse(tasks, "Tasks listed successfully")
     );
-});
+}).RequireAuthorization();
 
 app.MapPut("/tasks/{id:int}", async (int id, UpdateTaskDto dto, AppDbContext db) =>
 {
@@ -451,7 +546,7 @@ app.MapPut("/tasks/{id:int}", async (int id, UpdateTaskDto dto, AppDbContext db)
     return Results.Ok(
         ApiResponse<TaskResponseDto>.SuccessResponse(response, "Task updated successfully")
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 app.MapDelete("/tasks/{id:int}", async (int id, AppDbContext db) =>
 {
@@ -471,7 +566,7 @@ app.MapDelete("/tasks/{id:int}", async (int id, AppDbContext db) =>
     return Results.Ok(
         ApiResponse<string>.SuccessResponse("Task deleted successfully", "Task deleted successfully")
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 app.MapPost("/tasks/{taskId:int}/comments", async (
     int taskId,
@@ -516,7 +611,7 @@ app.MapPost("/tasks/{taskId:int}/comments", async (
         $"/comments/{comment.Id}",
         ApiResponse<CommentResponseDto>.SuccessResponse(response, "Comment created successfully")
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 app.MapGet("/tasks/{taskId:int}/comments", async (int taskId, AppDbContext db) =>
 {
@@ -545,7 +640,7 @@ app.MapGet("/tasks/{taskId:int}/comments", async (int taskId, AppDbContext db) =
             "Comments listed successfully"
         )
     );
-});
+}).RequireAuthorization();
 
 app.MapPut("/comments/{id:int}", async (int id, UpdateCommentDto dto, AppDbContext db) =>
 {
@@ -576,7 +671,7 @@ app.MapPut("/comments/{id:int}", async (int id, UpdateCommentDto dto, AppDbConte
             "Comment updated successfully"
         )
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 app.MapDelete("/comments/{id:int}", async (int id, AppDbContext db) =>
 {
@@ -599,7 +694,7 @@ app.MapDelete("/comments/{id:int}", async (int id, AppDbContext db) =>
             "Comment deleted successfully"
         )
     );
-});
+}).RequireAuthorization(p => p.RequireRole("Admin"));
 
 
 
