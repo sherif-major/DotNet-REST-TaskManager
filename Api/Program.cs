@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Api.Seed;
 using Api.DTOs.Project;
 using Api.DTOs.Task;
+using Api.DTOs.Comment;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -469,6 +470,134 @@ app.MapDelete("/tasks/{id:int}", async (int id, AppDbContext db) =>
 
     return Results.Ok(
         ApiResponse<string>.SuccessResponse("Task deleted successfully", "Task deleted successfully")
+    );
+});
+
+app.MapPost("/tasks/{taskId:int}/comments", async (
+    int taskId,
+    CreateCommentDto dto,
+    AppDbContext db) =>
+{
+    var taskExists = await db.TaskItems.AnyAsync(t => t.Id == taskId);
+    if (!taskExists)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Task not found")
+        );
+    }
+
+    var userExists = await db.Users.AnyAsync(u => u.Id == dto.UserId);
+    if (!userExists)
+    {
+        return Results.BadRequest(
+            ApiResponse<string>.Fail("UserId is invalid")
+        );
+    }
+
+    var comment = new Comment
+    {
+        Content = dto.Content,
+        TaskItemId = taskId,
+        UserId = dto.UserId
+    };
+
+    db.Comments.Add(comment);
+    await db.SaveChangesAsync();
+
+    var response = new CommentResponseDto
+    {
+        Id = comment.Id,
+        Content = comment.Content,
+        TaskItemId = comment.TaskItemId,
+        UserId = comment.UserId
+    };
+
+    return Results.Created(
+        $"/comments/{comment.Id}",
+        ApiResponse<CommentResponseDto>.SuccessResponse(response, "Comment created successfully")
+    );
+});
+
+app.MapGet("/tasks/{taskId:int}/comments", async (int taskId, AppDbContext db) =>
+{
+    var taskExists = await db.TaskItems.AnyAsync(t => t.Id == taskId);
+    if (!taskExists)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Task not found")
+        );
+    }
+
+    var comments = await db.Comments
+        .Where(c => c.TaskItemId == taskId)
+        .Select(c => new CommentResponseDto
+        {
+            Id = c.Id,
+            Content = c.Content,
+            TaskItemId = c.TaskItemId,
+            UserId = c.UserId
+        })
+        .ToListAsync();
+
+    return Results.Ok(
+        ApiResponse<List<CommentResponseDto>>.SuccessResponse(
+            comments,
+            "Comments listed successfully"
+        )
+    );
+});
+
+app.MapPut("/comments/{id:int}", async (int id, UpdateCommentDto dto, AppDbContext db) =>
+{
+    var comment = await db.Comments.FirstOrDefaultAsync(c => c.Id == id);
+    if (comment is null)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Comment not found")
+        );
+    }
+
+    comment.Content = dto.Content;
+    comment.UpdatedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync();
+
+    var response = new CommentResponseDto
+    {
+        Id = comment.Id,
+        Content = comment.Content,
+        TaskItemId = comment.TaskItemId,
+        UserId = comment.UserId
+    };
+
+    return Results.Ok(
+        ApiResponse<CommentResponseDto>.SuccessResponse(
+            response,
+            "Comment updated successfully"
+        )
+    );
+});
+
+app.MapDelete("/comments/{id:int}", async (int id, AppDbContext db) =>
+{
+    var comment = await db.Comments.FirstOrDefaultAsync(c => c.Id == id);
+    if (comment is null)
+    {
+        return Results.NotFound(
+            ApiResponse<string>.Fail("Comment not found")
+        );
+    }
+
+    comment.IsDeleted = true;
+    comment.UpdatedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(
+        ApiResponse<string>.SuccessResponse(
+            "Comment deleted successfully",
+            "Comment deleted successfully"
+        )
     );
 });
 
