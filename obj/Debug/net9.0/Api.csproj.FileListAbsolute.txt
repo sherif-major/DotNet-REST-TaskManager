@@ -1,0 +1,9 @@
+/home/serif/Masaüstü/Net9ApiOdev/obj/Debug/net9.0/Api.csproj.AssemblyReference.cache
+/home/serif/Masaüstü/Net9ApiOdev/obj/Debug/net9.0/rpswa.dswa.cache.json
+/home/serif/Masaüstü/Net9ApiOdev/obj/Debug/net9.0/Api.GeneratedMSBuildEditorConfig.editorconfig
+/home/serif/Masaüstü/Net9ApiOdev/obj/Debug/net9.0/Api.AssemblyInfoInputs.cache
+/home/serif/Masaüstü/Net9ApiOdev/obj/Debug/net9.0/Api.AssemblyInfo.cs
+/home/serif/Masaüstü/Net9ApiOdev/obj/Debug/net9.0/Api.csproj.CoreCompileInputs.cache
+/home/serif/Masaüstü/Net9ApiOdev/obj/Debug/net9.0/Api.MvcApplicationPartsAssemblyInfo.cs
+/home/serif/Masaüstü/Net9ApiOdev/obj/Debug/net9.0/Api.MvcApplicationPartsAssemblyInfo.cache
+/home/serif/Masaüstü/Net9ApiOdev/obj/Debug/net9.0/Api.sourcelink.json

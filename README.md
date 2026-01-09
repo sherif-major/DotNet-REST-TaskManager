@@ -146,10 +146,10 @@ Bir yorum bir kullanıcıya aittir
   "success": true,
   "message": "Project created",
   "data": {
-    "id": 1,
-    "name": "CRM Project",
-    "description": "Customer management system",
-    "userId": 1
+    "id": 4,
+    "name": "CRM (RBAC)",
+    "description": "Do the RBAC part in the CRM project.",
+    "userId": 5
   }
 }
 ```
@@ -159,7 +159,8 @@ Bir yorum bir kullanıcıya aittir
 ```json
 {
   "success": false,
-  "message": "Unauthorized"
+  "message": "Project not found",
+  "data": null
 }
 ```
 
@@ -172,11 +173,18 @@ dotnet restore
 dotnet run --project Api
 ```
 
-### Varsayılan Admin Kullanıcı:
+### Varsayılan Admin Kullanıcı (Seed data'dan gelen):
 
 - Username: admin
 - Password: admin123
 
 ### Swagger arayüzüne erişmek için:
 
-- <http://localhost:5000/swagger>
+- <http://localhost:{PORT}/swagger>
+
+### Uygulamayı Çalıştırmak İçin:
+
+```bash
+dotnet build
+dotnet run --project Api
+```
